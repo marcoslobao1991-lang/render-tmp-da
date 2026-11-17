@@ -120,7 +120,7 @@ const Legenda: React.FC<{ a: number; f: number; peds: ReturnType<typeof pedacos>
 };
 
 // celular: moldura de iPhone com a gravação real do app dentro (a gravação começa em `app` segundos)
-const Celular: React.FC<{ w: number; app: number; congela?: boolean; dur: number }> = ({ w, app, congela, dur }) => {
+export const Celular: React.FC<{ w: number; app: number; congela?: boolean; dur: number }> = ({ w, app, congela, dur }) => {
   const h = w * (1688 / 780);
   const borda = w * 0.035;
   const raio = w * 0.13;
