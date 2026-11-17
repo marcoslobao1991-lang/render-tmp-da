@@ -159,6 +159,7 @@ jobs:
           # o render só serve se tiver exatamente os frames pedidos
           REAL=$(ffprobe -v error -select_streams v:0 -count_frames \
             -show_entries stream=nb_read_frames -of csv=p=0 "$COMP.mp4")
+          REAL=$(echo "$REAL" | tr -cd "0-9")
           echo "frames: $REAL (esperado $ESPERADO)"
           if [ "$REAL" != "$ESPERADO" ]; then
             echo "ERRO: contagem de frames não bate com a composição."
