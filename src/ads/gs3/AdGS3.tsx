@@ -32,7 +32,8 @@ const BATE = { damping: 12, stiffness: 200, mass: 0.55 };
 const sp = (f: number, emFrame: number, cfg = BATE) => spring({ frame: f - emFrame, fps: FPS, config: cfg });
 
 // momentos da gravação real do app (app-hd-marcas.json). Antes de 7,5 s aparece "Boa tarde, Marcos": nunca usar.
-const APP = { series: 9.0, eps: 11.9, cena: 19.15, en: 22.85, repetir: 26.15, pt: 33.95, shadSeries: 47.6, shadCena: 52.7, mic: 56.17 };
+// trechos PROIBIDOS da gravação: 13,0–19,2 (tela branca e vídeo carregando ao abrir o episódio) e 43,5–45 ("Boa tarde, Marcos")
+const APP = { lista: 7.9, series: 9.0, eps: 10.6, cena: 19.25, en: 22.85, repetir: 26.15, pt: 33.95, shadSeries: 46.0, shadCena: 52.7, mic: 56.17 };
 
 type W = { w: string; a: number; b: number };
 type Vis =
@@ -61,7 +62,7 @@ const CFG: Record<string, Cfg> = {
       { de: 12.68, ate: 14.3, v: { k: "fone" } },                        // "sem precisar da tela ligada"
       { de: 14.3, ate: 18.02, v: { k: "barra", cem: 17.34 } },           // "entende um episódio inteiro, todo sem legenda"
       { de: 18.02, ate: 22.82, v: { k: "escada", eps: [18.02, 19.56, 20.96, 21.53, 22.18] } },
-      { de: 26.02, ate: 28.08, v: { k: "app", app: APP.series } },       // "assistir qualquer coisa sem legenda"
+      { de: 26.02, ate: 28.08, v: { k: "app", app: APP.lista } },       // "assistir qualquer coisa sem legenda"
       { de: 28.08, ate: 30.74, v: { k: "app", app: APP.shadSeries } },   // "treinos de fala"
       { de: 30.74, ate: 32.34, v: { k: "app", app: APP.mic - 0.6 } },    // "grava a sua fala": mic entra em "grava"
       { de: 32.34, ate: 36.76, v: { k: "nota" } },                       // "feedback instantâneo de IA, nota da pronúncia"
@@ -94,7 +95,7 @@ const CFG: Record<string, Cfg> = {
       { de: 10.26, ate: 12.46, v: { k: "fone" } },                       // "direto no seu fone de ouvido"
       { de: 12.46, ate: 15.76, v: { k: "barra", cem: 14.86 } },          // "primeiro episódio 100% sem legenda"
       { de: 15.76, ate: 19.08, v: { k: "escada", eps: [15.5, 15.76, 16.66, 17.68, 18.13] } },
-      { de: 21.45, ate: 23.34, v: { k: "app", app: APP.series } },       // "mas qualquer coisa"
+      { de: 21.45, ate: 23.34, v: { k: "app", app: APP.lista } },       // "mas qualquer coisa"
       { de: 25.7, ate: 28.48, v: { k: "app", app: APP.shadSeries } },    // "treinos de fala"
       { de: 28.48, ate: 33.26, v: { k: "nota" } },                       // "feedback instantâneo da IA... pronúncia"
       { de: 33.26, ate: 37.85, v: { k: "app", app: APP.mic - 0.75 } },   // "gravar os takes imitando"
@@ -396,6 +397,30 @@ const CEL = 537, CEL_W = CEL * 1.07;
 type Seg = { f0: number; f1: number; v: Vis; congela?: boolean; cena?: boolean };
 const ehFone = (v: Vis) => v.k === "app" || v.k === "fone";
 
+// linha do tempo do celular/cartões em frames do ad (pura: a composição e o checa-app.tsx usam a mesma)
+export const segmentos = (id: string, ordem: Ordem): Seg[] => {
+  const c = CFG[id];
+  const { H, S, corte } = tempos(c, ordem);
+  const V = vel(c);
+  const fH = fr(H), fS = fr(S);
+  const fBruto = (s: number) => fr(s < corte ? (s - c.vStart) / V : S + (s - corte) / V);
+  const fimTotal = duracaoGS3(id, ordem);
+  const out: Seg[] = [];
+  if (fH > 0) out.push({ f0: 0, f1: fH, v: { k: "app", app: APP_PARADO }, congela: true });
+  out.push({ f0: fH, f1: fS, v: { k: "app", app: HOOK_APP }, cena: true });
+  let cur = fS;
+  for (const j of c.janelas) {
+    const a0 = Math.max(fS, fBruto(j.de)), a1 = fBruto(j.ate);
+    if (a1 <= a0) continue;
+    if (a0 > cur + 2) out.push({ f0: cur, f1: a0, v: { k: "app", app: APP_LIVRE } });
+    out.push({ f0: Math.max(cur, a0), f1: a1, v: j.v });
+    cur = a1;
+  }
+  if (fimTotal > cur) out.push({ f0: cur, f1: fimTotal + 1, v: { k: "app", app: APP_LIVRE } });
+  return out;
+};
+export const CFG_DEBUG = { CFG, segmentos };
+
 export const AdGS3: React.FC<{ id: string; ordem?: Ordem }> = ({ id, ordem = "hook" }) => {
   const c = CFG[id];
   const f = useCurrentFrame();
@@ -410,24 +435,8 @@ export const AdGS3: React.FC<{ id: string; ordem?: Ordem }> = ({ id, ordem = "ho
   const fz = React.useMemo(() => frases(c.words, c.vStart), [c]);
   const adS = (s: number) => (s < corte ? (s - c.vStart) / V : S + (s - corte) / V);
   const fBruto = (s: number) => fr(adS(s));
-  const fimTotal = duracaoGS3(id, ordem);
 
-  const segs = React.useMemo(() => {
-    const out: Seg[] = [];
-    if (temHook) out.push({ f0: 0, f1: fH, v: { k: "app", app: APP_PARADO }, congela: true });
-    out.push({ f0: fH, f1: fS, v: { k: "app", app: HOOK_APP }, cena: true });
-    let cur = fS;
-    for (const j of c.janelas) {
-      const a0 = Math.max(fS, fBruto(j.de)), a1 = fBruto(j.ate);
-      if (a1 <= a0) continue;
-      if (a0 > cur + 2) out.push({ f0: cur, f1: a0, v: { k: "app", app: APP_LIVRE } });
-      out.push({ f0: Math.max(cur, a0), f1: a1, v: j.v });
-      cur = a1;
-    }
-    if (fimTotal > cur) out.push({ f0: cur, f1: fimTotal + 1, v: { k: "app", app: APP_LIVRE } });
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, ordem]);
+  const segs = React.useMemo(() => segmentos(id, ordem), [id, ordem]);
 
   // celular (3 estados): hook = grande no centro, com o Friends já à vista; cena = maior ainda, tocando com som;
   // corpo = à esquerda. O vídeo do app fica sempre acima da legenda e abaixo da headline.
@@ -499,8 +508,8 @@ export const AdGS3: React.FC<{ id: string; ordem?: Ordem }> = ({ id, ordem = "ho
 
       {/* cada trecho PRÉ-CARREGADO 1 s antes (premountFor): o celular nunca abre em branco na emenda */}
       {segs.map((seg, i) => (
-        <Sequence key={i} from={seg.f0} durationInFrames={seg.f1 - seg.f0 + 1} premountFor={30}>
-          {palco(seg, i)}
+        <Sequence key={i} from={seg.f0} durationInFrames={seg.f1 - seg.f0} premountFor={30}>
+          <div style={{ position: "absolute", inset: 0, opacity: f < seg.f0 ? 0 : 1 }}>{palco(seg, i)}</div>
         </Sequence>
       ))}
 
