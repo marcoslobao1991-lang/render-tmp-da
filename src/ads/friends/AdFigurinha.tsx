@@ -59,7 +59,7 @@ const monta = (id: string) => {
   const c = VARS[id];
   const H = c.pre; // a voz do gancho começa aqui
   const fimH = c.hook.words[c.hook.words.length - 1].end;
-  const B0 = H + fimH + 0.12; // o corpo do d4 entra aqui (pausa total até "Olha" = 0,20 s)
+  const B0 = H + fimH - 0.06; // o corpo do d4 entra aqui (render 18/11 mediu 0,36-0,44 s até "Olha" com +0,12; regra: pausa ≤ 0,25 s)
   const desl = (t: number) => B0 + (t - CORPO_DE);
   const words: W[] = [
     ...c.hook.words.map((w) => ({ ...w, start: w.start + H, end: w.end + H })),
