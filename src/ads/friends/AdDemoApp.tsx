@@ -90,7 +90,7 @@ export type AdDemoAppProps = { id: string };
 export const duracaoDemoApp = (id: string) => fr(CFG[id].words.duration + CFG[id].off + 0.5);
 
 const limpa = (s: string) => s.replace(/[.,!?;:"]/g, "").toLowerCase();
-const pedacos = (ws0: W[]) => {
+export const pedacos = (ws0: W[]) => {
   const out: { ws: W[]; ini: number; fim: number }[] = [];
   let cur: W[] = [];
   const fecha = () => { if (cur.length) out.push({ ws: cur, ini: cur[0].start, fim: cur[cur.length - 1].end }); cur = []; };
@@ -98,7 +98,7 @@ const pedacos = (ws0: W[]) => {
   fecha();
   return out.map((p, i) => ({ ...p, ate: Math.min(out[i + 1]?.ini ?? p.fim + 0.6, p.fim + 0.6) }));
 };
-const Legenda: React.FC<{ a: number; f: number; peds: ReturnType<typeof pedacos>; y: number; quente: RegExp }> = ({ a, f, peds, y, quente }) => {
+export const Legenda: React.FC<{ a: number; f: number; peds: ReturnType<typeof pedacos>; y: number; quente: RegExp }> = ({ a, f, peds, y, quente }) => {
   const p = peds.find((k) => a >= k.ini - 0.04 && a < k.ate);
   if (!p) return null;
   const s = spring({ frame: f - fr(p.ini - 0.04), fps: FPS, config: { damping: 12, stiffness: 260, mass: 0.45 } });
@@ -145,7 +145,7 @@ export const Celular: React.FC<{ w: number; app: number; congela?: boolean; dur:
   );
 };
 
-const Adesivo: React.FC<{ txt: string; f: number; em: number; y: number; rot?: number }> = ({ txt, f, em, y, rot = -3 }) => {
+export const Adesivo: React.FC<{ txt: string; f: number; em: number; y: number; rot?: number }> = ({ txt, f, em, y, rot = -3 }) => {
   if (f < fr(em)) return null;
   const s = spr(f, em);
   return (
@@ -154,7 +154,7 @@ const Adesivo: React.FC<{ txt: string; f: number; em: number; y: number; rot?: n
     </div>
   );
 };
-const Seta: React.FC<{ f: number; em: number }> = ({ f, em }) => {
+export const Seta: React.FC<{ f: number; em: number }> = ({ f, em }) => {
   if (f < fr(em)) return null;
   const s = spr(f, em);
   const pulo = Math.sin((f - fr(em)) / 5) * 14;
